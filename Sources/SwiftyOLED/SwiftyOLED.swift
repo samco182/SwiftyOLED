@@ -26,9 +26,9 @@ public final class OLED  {
     
     
     
-    public init(connectedTo interface: I2CInterface, at address: Int, width: Int, height: Int) {
+    public init(connectedTo interface: I2CInterface, at address: Int, width: Int, height: Int) throws {
         
-        guard interface.isReachable(address) else {
+        guard try interface.isReachable(address) else {
             fatalError("""
                 Can not reach display at given interface and address!
                 Make sure that those are correct and the everything is wired correctly!
@@ -46,37 +46,37 @@ public final class OLED  {
         self.height = height
         
         self.buffer = Array<UInt8>(repeating: 0, count: Int(width*(height/8)))
-        initialization()
+        try initialization()
     }
     
     //This method MUST be called when initialazing
     //It performs neccessary setup
     //Please refer to page 10 (section 4.4) of UG-2832HSWEG02 datasheet for more info.
-    internal func initialization() {
-        self.turn(.off)
-        send(command: .SetDisplayClockDiv)
-        send(customCommand: 0x80)                                  // the suggested ratio 0x80
-        send(command: .SetMultiplex)
-        send(customCommand: 0x1F)
-        send(command: .SetDisplayOffset)
-        send(customCommand: 0x0)                                   // no offset
-        send(customCommand: Command.SetStartLine.rawValue | 0x0)   // line #0
-        send(command: .ChargePump)
-        send(customCommand: 0x14)
-        send(command: .MemoryMode)                                  // 0x20
-        send(customCommand: 0x00)                                  // 0x0 act like ks0108
-        send(customCommand: Command.SEGREMAP.rawValue | 0x1)
-        send(command: .COMSCANDEC)
-        send(command: .SetComPins)
-        send(customCommand: 0x02)
-        self.set(brightness: .custom(value: UInt8(0x8F)))
-        send(command: .SetPrecharge)
-        send(customCommand: 0xF1)
-        send(command: .SetVComDetect)
-        send(customCommand: 0x40)
-        send(command: .DisplayAllOnResume)
-        send(command: .NormalDisplay)
-        self.turn(.on)
+    internal func initialization() throws {
+        try self.turn(.off)
+        try send(command: .SetDisplayClockDiv)
+        try send(customCommand: 0x80)                                  // the suggested ratio 0x80
+        try send(command: .SetMultiplex)
+        try send(customCommand: 0x1F)
+        try send(command: .SetDisplayOffset)
+        try send(customCommand: 0x0)                                   // no offset
+        try send(customCommand: Command.SetStartLine.rawValue | 0x0)   // line #0
+        try send(command: .ChargePump)
+        try send(customCommand: 0x14)
+        try send(command: .MemoryMode)                                  // 0x20
+        try send(customCommand: 0x00)                                  // 0x0 act like ks0108
+        try send(customCommand: Command.SEGREMAP.rawValue | 0x1)
+        try send(command: .COMSCANDEC)
+        try send(command: .SetComPins)
+        try send(customCommand: 0x02)
+        try self.set(brightness: .custom(value: UInt8(0x8F)))
+        try send(command: .SetPrecharge)
+        try send(customCommand: 0xF1)
+        try send(command: .SetVComDetect)
+        try send(customCommand: 0x40)
+        try send(command: .DisplayAllOnResume)
+        try send(command: .NormalDisplay)
+        try self.turn(.on)
     }
     
     //Makes point (tuplet of x and y coordinates) white
@@ -113,49 +113,49 @@ public final class OLED  {
     }
     
     //Makes data from buffer appear on physical display
-    public func display() {
-        send(command: Command.ColumnAddr)
-        send(customCommand: 0)
-        send(customCommand: UInt8(width-1))
-        send(command: Command.PageAddr)
-        send(customCommand: 0)
-        send(customCommand: UInt8((height/8)-1))
-        sendBuffer()
+    public func display() throws {
+        try send(command: Command.ColumnAddr)
+        try send(customCommand: 0)
+        try send(customCommand: UInt8(width-1))
+        try send(command: Command.PageAddr)
+        try send(customCommand: 0)
+        try send(customCommand: UInt8((height/8)-1))
+        try sendBuffer()
     }
     
     //Inverts display's interpretation of the buffer
     //What previously was black will be white and the other way around
-    public func set(inversion: Bool) {
+    public func set(inversion: Bool) throws {
         if inversion {
-            send(command: .InvertDisplay)
+            try send(command: .InvertDisplay)
             self.isInverted = true
         } else {
-            send(command: .NormalDisplay)
+            try send(command: .NormalDisplay)
             self.isInverted = false
         }
     }
     
-    public func set(brightness: Brightness) {
+    public func set(brightness: Brightness) throws {
         switch brightness {
         case .dimmed:
-            send(command: .SetContrast)
-            send(customCommand: 0x00)
+            try send(command: .SetContrast)
+            try send(customCommand: 0x00)
         case .bright:
-            send(command: .SetContrast)
-            send(customCommand: 0xCF)
+            try send(command: .SetContrast)
+            try send(customCommand: 0xCF)
         case .custom(let value):
-            send(command: .SetContrast)
-            send(customCommand: value)
+            try send(command: .SetContrast)
+            try send(customCommand: value)
         }
     }
     
-    public func turn(_ designatedState: State) {
+    public func turn(_ designatedState: State) throws {
         switch designatedState {
         case .on:
-            send(command: .DisplayOn)
+            try send(command: .DisplayOn)
             self.isOn = true
         case .off:
-            send(command: .DisplayOff)
+            try send(command: .DisplayOff)
             self.isOn = false
         }
     }
@@ -200,12 +200,12 @@ extension OLED {
         case VerticalAndLeftHorizontalScroll        = 0x2A
     }
     
-    internal func send(command: Command) {
-        i2c.writeByte(self.address, command: 0b00000000, value: command.rawValue) //Co=0 D/C#=0
+    internal func send(command: Command) throws {
+        try i2c.writeByte(self.address, command: 0b00000000, value: command.rawValue) //Co=0 D/C#=0
     }
     
-    internal func send(customCommand: UInt8) {
-        i2c.writeByte(self.address, command: 0b00000000, value: customCommand) //Co=0 D/C#=0
+    internal func send(customCommand: UInt8) throws {
+        try i2c.writeByte(self.address, command: 0b00000000, value: customCommand) //Co=0 D/C#=0
     }
 }
 
@@ -214,23 +214,23 @@ extension OLED {
 
     //This method is slow, use it only when neccessary!
     //Usage of sendBuffer() is higly recommended
-    internal func sendBufferByteByByte() {
+    internal func sendBufferByteByByte() throws {
         for pageColumn in buffer {
-            i2c.writeByte(self.address, command: 0b01000000, value: pageColumn) //Co=0 D/C#=1
+            try i2c.writeByte(self.address, command: 0b01000000, value: pageColumn) //Co=0 D/C#=1
         }
     }
     
-    internal func sendBuffer() {
+    internal func sendBuffer() throws {
         
         //send packages of 32 Bytes, which is I2C max number of bytes send at once
         let numberOfFullPackets = buffer.count/32
         for i in 1...numberOfFullPackets {
-            i2c.writeI2CData(self.address, command: 0b01000000, values: Array(buffer[(i-1)*32...(i*32)-1])) //Co=0 D/C#=1
+            try i2c.writeI2CData(self.address, command: 0b01000000, values: Array(buffer[(i-1)*32...(i*32)-1])) //Co=0 D/C#=1
         }
         
         //if there aren't enought bytes left to form a full (32 Bytes) package send them
         if numberOfFullPackets*32 != buffer.count {
-            i2c.writeI2CData(self.address, command: 0b01000000, values: Array(buffer[numberOfFullPackets*32...buffer.count-1])) //Co=0 D/C#=1
+            try i2c.writeI2CData(self.address, command: 0b01000000, values: Array(buffer[numberOfFullPackets*32...buffer.count-1])) //Co=0 D/C#=1
         }
     }
     
